@@ -310,9 +310,12 @@
   var state = {
     compass:null, samplesUsed:0,
     sat:null, lat:null, lng:null,
-    lastAlpha:null, source:"none", screenAngle:0, eventCount:0
+    lastAlpha:null, source:"none", screenAngle:0, eventCount:0, absolute:null
   };
   var live = null, capturing = false, buffer = [];
+  var haveAbsolute = false;   // once a true-north (absolute) event arrives, ignore the relative stream
+  var smoothHeading = null;   // low-pass value used only for the live display
+  var recent = [];            // recent raw headings, for the steadiness check
 
   function $(id){ return document.getElementById(id); }
   function showScreen(id, stepIdx){
@@ -374,37 +377,67 @@
     }catch(e){}
     return 0;
   }
-  function headingFromEvent(e){
+  function rawHeading(e){
     state.screenAngle = readScreenAngle();
     if(typeof e.webkitCompassHeading === "number" && !isNaN(e.webkitCompassHeading)){
-      state.source = "iOS webkitCompassHeading";
-      state.lastAlpha = e.alpha;
+      state.source = "iOS compass"; state.lastAlpha = e.alpha; state.absolute = true;
       return norm360(e.webkitCompassHeading + state.screenAngle);
     }
     if(e.alpha != null){
-      state.source = e.absolute ? "deviceorientationabsolute" : "deviceorientation";
-      state.lastAlpha = e.alpha;
+      state.source = e.absolute ? "absolute (true north)" : "relative (no true north)";
+      state.lastAlpha = e.alpha; state.absolute = !!e.absolute;
       return norm360(360 - e.alpha + state.screenAngle);
     }
     return null;
   }
-  function onOrient(e){
-    var h = headingFromEvent(e);
+  function smoothCircular(prev, next, a){
+    if(prev == null) return next;
+    var s = a*Math.sin(prev*Math.PI/180) + (1-a)*Math.sin(next*Math.PI/180);
+    var c = a*Math.cos(prev*Math.PI/180) + (1-a)*Math.cos(next*Math.PI/180);
+    return norm360(Math.atan2(s,c)*180/Math.PI);
+  }
+  function steadiness(){          // max wobble of recent samples; null until enough data
+    if(recent.length < 6) return null;
+    var m = circularMean(recent), max = 0;
+    for(var i=0;i<recent.length;i++){ var d = angleDiff(recent[i], m); if(d > max) max = d; }
+    return max;
+  }
+  function setHint(msg){ var h=$("cal-hint"); h.style.display="block"; h.textContent=msg; }
+
+  function handleOrient(e, isAbsolute){
+    // Lock onto the absolute source. Once it has fired, ignore the relative
+    // deviceorientation stream so the two don't fight and jitter the reading.
+    if(haveAbsolute && !isAbsolute && typeof e.webkitCompassHeading !== "number") return;
+    if(isAbsolute) haveAbsolute = true;
+
+    var h = rawHeading(e);
     if(h == null) return;
     state.eventCount++;
-    live = h;
-    $("rose").style.transform = "rotate(" + (-h) + "deg)";
-    $("live-deg").textContent = Math.round(h) + "°";
-    $("live-dir").textContent = card16(h);
-    if($("cal-hint").style.display !== "none" && state.eventCount > 6){
-      $("cal-hint").style.display = "none";
+    live = h;                                              // raw — used for capture
+    smoothHeading = smoothCircular(smoothHeading, h, 0.82); // smoothed — used for display
+    recent.push(h); if(recent.length > 12) recent.shift();
+
+    $("rose").style.transform = "rotate(" + (-smoothHeading) + "deg)";
+    $("live-deg").textContent = Math.round(smoothHeading) + "°";
+    $("live-dir").textContent = card16(smoothHeading);
+
+    var spread = steadiness();
+    if(state.absolute === false){
+      setHint("⚠ This phone is giving relative direction, not true north — it will keep drifting. Rely on the satellite step; we'll treat the compass as a loose check.");
+    } else if(spread != null && spread > 8){
+      setHint("Reading is wandering — move away from the laptop / metal desk, or step outside, then wait for “Steady”.");
+    } else if(spread != null){
+      setHint("Steady ✓ — good moment to capture.");
+    } else if(state.eventCount <= 6){
+      setHint("Wave the phone in a figure-8 a few times to calibrate.");
     }
+
     if(capturing) buffer.push(h);
   }
 
   function attachOrientation(){
-    window.addEventListener("deviceorientationabsolute", onOrient, true);
-    window.addEventListener("deviceorientation", onOrient, true);
+    window.addEventListener("deviceorientationabsolute", function(e){ handleOrient(e, true);  }, true);
+    window.addEventListener("deviceorientation",         function(e){ handleOrient(e, false); }, true);
   }
 
   function begin(){
