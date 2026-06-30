@@ -141,6 +141,50 @@
 
   .err{color:var(--bad);font-size:13px;margin-top:8px}
   .footnote{text-align:center;color:var(--muted);font-size:12px;line-height:1.5}
+  /* ---- floor plan ---- */
+  .fp-banner{background:var(--surface-2);border:1px solid var(--gold-deep);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45;color:var(--ink)}
+  .fp-banner b{color:var(--gold)}
+  .stepper{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:10px}
+  .stepper .lab{flex:1;font-size:14px}
+  .stepper button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);font-size:22px;cursor:pointer;line-height:1}
+  .stepper .num{min-width:32px;text-align:center;font-family:Marcellus,serif;font-size:20px;font-variant-numeric:tabular-nums}
+
+  .fp-stage{position:relative;margin:10px auto;touch-action:none}
+  .fp-grid{position:absolute;inset:0;display:grid;gap:0}
+  .fp-cell{border:1px solid rgba(243,237,224,0.06)}
+  .fp-zones{position:absolute;inset:0;pointer-events:none;overflow:visible}
+  .fp-labels{position:absolute;inset:0;pointer-events:none}
+  .fp-label{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:600;color:#10152e;background:rgba(243,237,224,0.85);padding:1px 5px;border-radius:5px;white-space:nowrap}
+  .fp-feat{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:700;color:#10152e;background:var(--gold);padding:1px 5px;border-radius:8px;white-space:nowrap}
+  .door-mark{position:absolute;transform:translate(-50%,-50%);color:var(--gold);font-size:16px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+  .chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:20px;padding:7px 12px;font-size:13px;cursor:pointer;background:var(--surface)}
+  .chip .dot{width:11px;height:11px;border-radius:50%}
+  .chip.add{border-style:dashed;color:var(--gold);border-color:var(--gold-deep)}
+  .tool-row{display:flex;gap:8px;margin:10px 0}
+  .tool-row .btn{flex:1;padding:13px}
+  .btn-ghost.on{outline:2px solid var(--gold)}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(8,11,28,.74);z-index:800;display:none;align-items:flex-end;justify-content:center}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--line-strong);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:82vh;overflow:auto;padding:20px 18px calc(20px + env(safe-area-inset-bottom));animation:fade .25s ease}
+  .modal h3{font-family:Marcellus,serif;font-weight:400;font-size:20px;margin:0 0 14px}
+  .type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .type-opt{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;font-size:14px;background:var(--surface-2)}
+  .type-opt .dot{width:15px;height:15px;border-radius:5px;flex:0 0 auto}
+  .q{margin:16px 0}
+  .q .qt{font-size:14px;color:var(--ink);margin-bottom:9px;display:block}
+  .q-opts{display:flex;flex-wrap:wrap;gap:8px}
+  .q-opt{border:1px solid var(--line-strong);border-radius:10px;padding:9px 13px;font-size:13px;cursor:pointer;background:var(--surface-2);color:var(--ink)}
+  .q-opt.sel{background:var(--gold);color:#241a05;border-color:var(--gold)}
+
+  .zone-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:2px}
+  .zone-table th,.zone-table td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  .zone-table th{color:var(--muted);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  .zone-table td .z{color:var(--gold);font-weight:600}
+  .svg-wrap{background:#0f1530;border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+  .svg-wrap svg{width:100%;height:auto;display:block}
 </style>
 </head>
 <body>
@@ -261,6 +305,7 @@
       <div class="rrow"><span class="k">Apparent declination</span><span class="val" id="r-decl">—</span></div>
     </div>
 
+    <button class="btn btn-primary" id="btn-to-fp">Next: map the floor plan →</button>
     <div class="btn-row">
       <button class="btn btn-ghost" id="btn-copy">Copy data</button>
       <button class="btn btn-primary" id="btn-download">Download .json</button>
@@ -274,7 +319,60 @@
 
     <p class="footnote">This anchor file is what feeds the full Vastu map next.</p>
   </section>
+
+  <!-- FLOOR PLAN: SETUP -->
+  <section class="screen" id="screen-fp-setup">
+    <div class="card">
+      <p class="eyebrow">Floor plan · setup</p>
+      <h2 id="fp-anchor-line">Map your home on a grid</h2>
+      <p>This grid is drawn with <strong class="ink">North at the top</strong>. <span id="fp-entrance-hint"></span> Set roughly how the footprint is shaped, then add rooms one at a time.</p>
+    </div>
+    <div class="stepper"><span class="lab">Width (West ↔ East)</span><button id="cols-">−</button><span class="num" id="cols-n">10</span><button id="cols+">+</button></div>
+    <div class="stepper"><span class="lab">Depth (North ↔ South)</span><button id="rows-">−</button><span class="num" id="rows-n">10</span><button id="rows+">+</button></div>
+    <button class="btn btn-primary" id="fp-start">Start adding rooms</button>
+  </section>
+
+  <!-- FLOOR PLAN: EDITOR -->
+  <section class="screen" id="screen-fp-edit">
+    <div class="fp-banner" id="fp-banner">Tap <b>+ Add room</b> to begin.</div>
+    <div class="fp-stage" id="fp-stage">
+      <div class="fp-grid" id="fp-grid"></div>
+      <svg class="fp-zones" id="fp-zones"></svg>
+      <div class="fp-labels" id="fp-labels"></div>
+    </div>
+    <div class="tool-row">
+      <button class="btn btn-ghost" id="tool-erase">Eraser</button>
+      <button class="btn btn-ghost" id="tool-feature">+ Feature</button>
+    </div>
+    <div id="fp-paint-bar" style="display:none"><button class="btn btn-primary" id="fp-done-room">✓ Done with this room</button></div>
+    <div class="chips" id="room-chips"></div>
+    <div style="height:6px"></div>
+    <div class="btn-row" id="fp-idle-bar">
+      <button class="btn btn-ghost" id="fp-back-setup">Back</button>
+      <button class="btn btn-primary" id="fp-finish">Finish &amp; view zones</button>
+    </div>
+  </section>
+
+  <!-- FLOOR PLAN: SUMMARY -->
+  <section class="screen" id="screen-fp-summary">
+    <div class="card" style="padding:16px">
+      <p class="eyebrow">Your Vastu plan</p>
+      <div class="svg-wrap" id="plan-svg"></div>
+      <p id="plan-note" style="font-size:13px;margin:0"></p>
+    </div>
+    <table class="zone-table" id="zone-table"></table>
+    <div style="height:10px"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="fp-copy">Copy for Claude</button>
+      <button class="btn btn-primary" id="fp-download-json">Download data</button>
+    </div>
+    <button class="btn btn-ghost" id="fp-download-svg">Download plan image</button>
+    <button class="btn btn-ghost" id="fp-edit-again">← Back to editing</button>
+    <p class="footnote">Paste the data (or attach the image) into Claude for the full Vastu reading.</p>
+  </section>
 </div>
+
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -323,6 +421,8 @@
     for(var i=0;i<s.length;i++) s[i].classList.remove("active");
     $(id).classList.add("active");
     ["d0","d1","d2"].forEach(function(d,i){ $(d).classList.toggle("on", i<=stepIdx); });
+    var orient = (id==="screen-start"||id==="screen-compass"||id==="screen-satellite"||id==="screen-result");
+    var stEl = document.querySelector(".steps"); if(stEl) stEl.style.display = orient ? "flex" : "none";
     window.scrollTo(0,0);
   }
   var toastTimer;
@@ -670,6 +770,406 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
     toast("Saved entrance-orientation.json");
   });
+
+  /* ===================== Floor plan module ===================== */
+  var ROOM_TYPES = [
+    {k:"entrance",n:"Entrance / Foyer",c:"#c8902f"},
+    {k:"living",n:"Living room",c:"#4f9da6"},
+    {k:"kitchen",n:"Kitchen",c:"#d9694a"},
+    {k:"master",n:"Master bedroom",c:"#8a7bc8"},
+    {k:"bedroom",n:"Bedroom",c:"#6f8fb0"},
+    {k:"children",n:"Children's room",c:"#5fa3c4"},
+    {k:"pooja",n:"Pooja room",c:"#e0b341"},
+    {k:"bath",n:"Bathroom / Toilet",c:"#6b9a78"},
+    {k:"dining",n:"Dining",c:"#b07f9a"},
+    {k:"study",n:"Study / Office",c:"#8a8f5a"},
+    {k:"store",n:"Storage",c:"#8a7a6a"},
+    {k:"staircase",n:"Staircase",c:"#a86b6b"},
+    {k:"balcony",n:"Balcony / Open",c:"#5f8f7a"},
+    {k:"garage",n:"Garage / Parking",c:"#707890"},
+    {k:"other",n:"Other",c:"#9aa3c4"}
+  ];
+  var FEATURE_TYPES = [
+    {k:"oht",n:"Overhead water tank"},
+    {k:"ugw",n:"Underground water / Borewell"},
+    {k:"septic",n:"Septic / Drainage"},
+    {k:"well",n:"Well"},
+    {k:"pillar",n:"Central pillar"}
+  ];
+  var QSETS = {
+    kitchen:[{id:"cookFace",q:"Which way does the cook face at the stove?",o:["North","East","South","West","Not sure"]}],
+    master:[{id:"bedHead",q:"Head of the bed points toward?",o:["N","NE","E","SE","S","SW","W","NW","Not sure"]}],
+    bedroom:[{id:"bedHead",q:"Head of the bed points toward?",o:["N","NE","E","SE","S","SW","W","NW","Not sure"]}],
+    children:[{id:"bedHead",q:"Head of the bed points toward?",o:["N","NE","E","SE","S","SW","W","NW","Not sure"]}],
+    pooja:[{id:"prayFace",q:"You face which way when praying?",o:["North","East","North-East","Not sure"]}],
+    bath:[{id:"wcFace",q:"Facing direction when using the WC?",o:["North","East","South","West","Skip"]}],
+    staircase:[{id:"ascent",q:"Going up, the stairs turn…",o:["Clockwise","Anticlockwise","Straight","Not sure"]}],
+    store:[{id:"heavy",q:"Mostly heavy storage (lofts, lockers)?",o:["Yes","No"]}]
+  };
+  function colorOf(k){ for(var i=0;i<ROOM_TYPES.length;i++) if(ROOM_TYPES[i].k===k) return ROOM_TYPES[i].c; return "#9aa3c4"; }
+  function nameOf(k){ for(var i=0;i<ROOM_TYPES.length;i++) if(ROOM_TYPES[i].k===k) return ROOM_TYPES[i].n; return "Room"; }
+  function featName(k){ for(var i=0;i<FEATURE_TYPES.length;i++) if(FEATURE_TYPES[i].k===k) return FEATURE_TYPES[i].n; return k; }
+  function shortFeat(k){ return ({oht:"OHT",ugw:"Bore",septic:"Septic",well:"Well",pillar:"Pillar"})[k] || k; }
+  function hexA(hex,a){ var n=parseInt(hex.slice(1),16); return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")"; }
+  function esc(t){ return (t+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  var fp = { cols:10, rows:10, cell:32, rooms:[], features:[], curId:null, seq:1, mode:"idle", painting:false, featPick:null };
+  var lastSVG = "";
+
+  function fpAnchor(){ var o = exportObj(); return (o && o.entranceFacing) ? o.entranceFacing : null; }
+  function findRoom(id){ for(var i=0;i<fp.rooms.length;i++) if(fp.rooms[i].id===id) return fp.rooms[i]; return null; }
+  function cellOwner(key){ for(var i=0;i<fp.rooms.length;i++) if(fp.rooms[i].cells.indexOf(key)>=0) return fp.rooms[i]; return null; }
+
+  function showModal(html){ $("modal").innerHTML = html; $("modal-bg").classList.add("show"); }
+  function hideModal(){ $("modal-bg").classList.remove("show"); }
+
+  function saveFP(){ try{ localStorage.setItem("disha_fp", JSON.stringify({cols:fp.cols,rows:fp.rows,rooms:fp.rooms,features:fp.features,seq:fp.seq})); }catch(e){} }
+  function loadFP(){ try{ var s=localStorage.getItem("disha_fp"); return s?JSON.parse(s):null; }catch(e){ return null; } }
+
+  function edgeWord(b){
+    var map={"North":"top edge","North-East":"top-right corner","East":"right edge","South-East":"bottom-right corner",
+             "South":"bottom edge","South-West":"bottom-left corner","West":"left edge","North-West":"top-left corner"};
+    return map[vastuOf(b).dir] || "edge";
+  }
+  function startFloorPlan(){
+    var saved = loadFP();
+    if(saved && saved.rooms && saved.rooms.length){
+      if(window.confirm("Resume your saved floor plan?")){ fp.cols=saved.cols; fp.rows=saved.rows; fp.rooms=saved.rooms; fp.features=saved.features||[]; fp.seq=saved.seq||(fp.rooms.length+1); }
+    }
+    var a = fpAnchor();
+    $("cols-n").textContent = fp.cols; $("rows-n").textContent = fp.rows;
+    if(a){
+      $("fp-anchor-line").textContent = "Entrance faces " + a.vastuDirection + " (" + a.vastuSanskrit + ")";
+      $("fp-entrance-hint").innerHTML = "Your entrance faces <b style='color:var(--gold)'>" + a.vastuDirection + "</b>, so it sits on the " + edgeWord(a.trueHeadingDeg) + " of the grid (marked).";
+    } else {
+      $("fp-entrance-hint").textContent = "Place rooms relative to the compass labels around the grid.";
+    }
+    showScreen("screen-fp-setup", 2);
+  }
+
+  function sizeStage(){
+    var maxpx = Math.min(window.innerWidth*0.92, 380);
+    fp.cell = Math.floor(maxpx / Math.max(fp.cols, fp.rows));
+    if(fp.cell < 14) fp.cell = 14;
+    var w = fp.cell*fp.cols, h = fp.cell*fp.rows;
+    var st = $("fp-stage"); st.style.width = w+"px"; st.style.height = h+"px";
+    var g = $("fp-grid");
+    g.style.gridTemplateColumns = "repeat("+fp.cols+","+fp.cell+"px)";
+    g.style.gridTemplateRows = "repeat("+fp.rows+","+fp.cell+"px)";
+    $("fp-zones").setAttribute("viewBox", "0 0 "+w+" "+h);
+  }
+  function buildGrid(){
+    sizeStage();
+    var g = $("fp-grid"); g.innerHTML = "";
+    for(var r=0;r<fp.rows;r++) for(var c=0;c<fp.cols;c++){
+      var d = document.createElement("div"); d.className = "fp-cell"; d.dataset.r = r; d.dataset.c = c;
+      g.appendChild(d);
+    }
+    paintAllCells(); drawZones(); drawLabels();
+  }
+  function paintAllCells(){
+    var cells = $("fp-grid").children;
+    for(var i=0;i<cells.length;i++){
+      var d = cells[i], key = d.dataset.r+","+d.dataset.c, o = cellOwner(key);
+      d.style.background = o ? hexA(o.color,0.82) : "transparent";
+    }
+  }
+
+  function gridPointer(e, isDown){
+    if(fp.mode==="idle" && !fp.featPick) return;
+    var t = document.elementFromPoint(e.clientX, e.clientY);
+    if(!t || !t.classList || !t.classList.contains("fp-cell")) return;
+    var key = t.dataset.r + "," + t.dataset.c;
+    if(fp.featPick){ if(isDown) placeFeature(key); return; }
+    if(fp.mode==="erase"){ eraseCell(key); }
+    else if(fp.mode==="paint" && fp.curId){
+      var rm = findRoom(fp.curId);
+      if(rm){
+        var prev = cellOwner(key);
+        if(prev && prev !== rm){ prev.cells.splice(prev.cells.indexOf(key),1); }
+        if(rm.cells.indexOf(key) < 0) rm.cells.push(key);
+        t.style.background = hexA(rm.color,0.82);
+      }
+    }
+    drawZones(); drawLabels();
+  }
+  function eraseCell(key){
+    var o = cellOwner(key);
+    if(o){ var idx = o.cells.indexOf(key); if(idx>=0) o.cells.splice(idx,1); }
+    var p = key.split(",");
+    var d = $("fp-grid").querySelector('[data-r="'+p[0]+'"][data-c="'+p[1]+'"]');
+    if(d) d.style.background = "transparent";
+  }
+  function setupGridEvents(){
+    var st = $("fp-stage");
+    st.addEventListener("pointerdown", function(e){ fp.painting = true; e.preventDefault(); gridPointer(e, true); });
+    window.addEventListener("pointermove", function(e){ if(fp.painting) gridPointer(e, false); });
+    window.addEventListener("pointerup", function(){ fp.painting = false; });
+  }
+
+  function setPaintMode(on){
+    $("fp-paint-bar").style.display = on ? "block" : "none";
+    $("fp-idle-bar").style.display = on ? "none" : "flex";
+    $("room-chips").style.display = on ? "none" : "flex";
+  }
+  function updateToolButtons(){ $("tool-erase").classList.toggle("on", fp.mode==="erase"); }
+  function toggleErase(){
+    if(fp.mode==="erase"){ fp.mode = fp.curId ? "paint" : "idle"; $("fp-banner").innerHTML = "Eraser off."; }
+    else { fp.mode = "erase"; $("fp-banner").innerHTML = "Eraser on — tap cells to clear them."; }
+    updateToolButtons();
+  }
+
+  function openTypePicker(){
+    var html = '<h3>What room is this?</h3><div class="type-grid">';
+    for(var i=0;i<ROOM_TYPES.length;i++){ var t = ROOM_TYPES[i];
+      html += '<div class="type-opt" data-k="'+t.k+'"><span class="dot" style="background:'+t.c+'"></span>'+t.n+'</div>'; }
+    html += '</div>';
+    showModal(html);
+    var opts = $("modal").querySelectorAll(".type-opt");
+    for(var j=0;j<opts.length;j++) opts[j].addEventListener("click", function(){ var k=this.dataset.k; hideModal(); beginRoom(k); });
+  }
+  function beginRoom(k){
+    var rm = { id:"r"+(fp.seq++), type:k, label:nameOf(k), cells:[], answers:{} };
+    fp.rooms.push(rm); fp.curId = rm.id; fp.mode = "paint";
+    $("fp-banner").innerHTML = "Painting <b>"+nameOf(k)+"</b> — tap or drag the cells it covers, then tap Done.";
+    setPaintMode(true); updateToolButtons(); saveFP();
+  }
+  function doneRoom(){
+    var rm = findRoom(fp.curId);
+    if(!rm || rm.cells.length===0){ toast("Paint at least one cell first"); return; }
+    fp.mode = "idle"; updateToolButtons();
+    openQuestions(rm);
+  }
+  function finalizeRoom(){
+    fp.curId = null; setPaintMode(false);
+    $("fp-banner").innerHTML = "Room saved. Add the next room, or tap <b>Finish</b> when the whole home is mapped.";
+    renderChips(); saveFP();
+  }
+  function openQuestions(rm){
+    var qs = QSETS[rm.type];
+    if(!qs){ finalizeRoom(); return; }
+    var html = '<h3>'+nameOf(rm.type)+' — quick Vastu details</h3>';
+    for(var i=0;i<qs.length;i++){ var q = qs[i];
+      html += '<div class="q" data-q="'+q.id+'"><span class="qt">'+q.q+'</span><div class="q-opts">';
+      for(var j=0;j<q.o.length;j++) html += '<div class="q-opt" data-v="'+esc(q.o[j])+'">'+q.o[j]+'</div>';
+      html += '</div></div>';
+    }
+    html += '<button class="btn btn-primary" id="q-save">Save room</button>';
+    showModal(html);
+    var groups = $("modal").querySelectorAll(".q");
+    groups.forEach(function(g){
+      var pre = rm.answers[g.dataset.q];
+      g.querySelectorAll(".q-opt").forEach(function(o){
+        if(pre && o.dataset.v===pre) o.classList.add("sel");
+        o.addEventListener("click", function(){
+          g.querySelectorAll(".q-opt").forEach(function(x){ x.classList.remove("sel"); });
+          this.classList.add("sel");
+        });
+      });
+    });
+    $("q-save").addEventListener("click", function(){
+      groups.forEach(function(g){ var s = g.querySelector(".q-opt.sel"); rm.answers[g.dataset.q] = s ? s.dataset.v : null; });
+      hideModal(); finalizeRoom();
+    });
+  }
+
+  function renderChips(){
+    var box = $("room-chips"); box.innerHTML = "";
+    fp.rooms.forEach(function(rm){
+      var c = document.createElement("div"); c.className = "chip";
+      c.innerHTML = '<span class="dot" style="background:'+colorOf(rm.type)+'"></span>'+esc(rm.label)+' ('+rm.cells.length+')';
+      c.addEventListener("click", function(){ editRoom(rm.id); });
+      box.appendChild(c);
+    });
+    var add = document.createElement("div"); add.className = "chip add"; add.textContent = "+ Add room";
+    add.addEventListener("click", openTypePicker); box.appendChild(add);
+  }
+  function editRoom(id){
+    var rm = findRoom(id); if(!rm) return;
+    showModal('<h3>'+esc(rm.label)+'</h3><div class="type-grid">'+
+      '<div class="type-opt" id="ed-repaint">✎ Repaint cells</div>'+
+      '<div class="type-opt" id="ed-quest">＝ Edit details</div>'+
+      '<div class="type-opt" id="ed-rename">✏ Rename</div>'+
+      '<div class="type-opt" id="ed-del" style="color:var(--bad)">🗑 Delete room</div></div>');
+    $("ed-repaint").addEventListener("click", function(){ hideModal(); fp.curId=id; fp.mode="paint"; setPaintMode(true); updateToolButtons(); $("fp-banner").innerHTML="Editing <b>"+esc(rm.label)+"</b> — add cells, or use Eraser to remove. Then Done."; });
+    $("ed-quest").addEventListener("click", function(){ hideModal(); openQuestions(rm); });
+    $("ed-rename").addEventListener("click", function(){ hideModal(); var nm=window.prompt("Room name", rm.label); if(nm){ rm.label=nm; renderChips(); drawLabels(); saveFP(); } });
+    $("ed-del").addEventListener("click", function(){ hideModal(); fp.rooms = fp.rooms.filter(function(x){ return x.id!==id; }); if(fp.curId===id){ fp.curId=null; setPaintMode(false); } paintAllCells(); renderChips(); drawZones(); drawLabels(); saveFP(); });
+  }
+
+  function openFeaturePicker(){
+    var html = '<h3>Mark a feature</h3><p style="margin-bottom:12px">Pick one, then tap its spot on the grid.</p><div class="type-grid">';
+    FEATURE_TYPES.forEach(function(f){ html += '<div class="type-opt" data-fk="'+f.k+'">'+f.n+'</div>'; });
+    html += '</div>';
+    showModal(html);
+    $("modal").querySelectorAll("[data-fk]").forEach(function(o){
+      o.addEventListener("click", function(){ fp.featPick = this.dataset.fk; hideModal(); $("fp-banner").innerHTML = "Tap the grid where the <b>"+featName(fp.featPick)+"</b> is."; });
+    });
+  }
+  function placeFeature(key){
+    fp.features.push({ type:fp.featPick, cell:key });
+    fp.featPick = null;
+    $("fp-banner").innerHTML = "Feature placed. Add more, or continue.";
+    drawLabels(); saveFP();
+  }
+
+  function paintedBBox(){
+    var minR=1e9,maxR=-1,minC=1e9,maxC=-1,any=false;
+    fp.rooms.forEach(function(rm){ rm.cells.forEach(function(k){ var p=k.split(","),r=+p[0],c=+p[1]; any=true; if(r<minR)minR=r; if(r>maxR)maxR=r; if(c<minC)minC=c; if(c>maxC)maxC=c; }); });
+    if(!any) return null;
+    return { minR:minR, maxR:maxR, minC:minC, maxC:maxC };
+  }
+  function zoneOfCell(r,c,bb){
+    var rs = bb.maxR-bb.minR+1, cs = bb.maxC-bb.minC+1;
+    var rz = Math.min(2, Math.floor((r-bb.minR)/rs*3));
+    var cz = Math.min(2, Math.floor((c-bb.minC)/cs*3));
+    var Z = [["North-West","North","North-East"],["West","Brahmasthan","East"],["South-West","South","South-East"]];
+    return Z[rz][cz];
+  }
+  function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+  function drawZones(){
+    var svg = $("fp-zones"); svg.innerHTML = "";
+    var w2 = fp.cell*fp.cols;
+    var nl = svgNS("text"); nl.setAttribute("x", w2/2); nl.setAttribute("y", 11); nl.setAttribute("fill","#e0563b"); nl.setAttribute("font-size","11"); nl.setAttribute("text-anchor","middle"); nl.textContent = "N ↑"; svg.appendChild(nl);
+    var bb = paintedBBox(); if(!bb) return;
+    var x0 = bb.minC*fp.cell, y0 = bb.minR*fp.cell;
+    var w = (bb.maxC-bb.minC+1)*fp.cell, h = (bb.maxR-bb.minR+1)*fp.cell;
+    function line(x1,y1,x2,y2,dash){ var l=svgNS("line"); l.setAttribute("x1",x1); l.setAttribute("y1",y1); l.setAttribute("x2",x2); l.setAttribute("y2",y2); l.setAttribute("stroke","rgba(232,181,74,0.5)"); if(dash) l.setAttribute("stroke-dasharray","4 4"); l.setAttribute("stroke-width","1"); svg.appendChild(l); }
+    var rect=svgNS("rect"); rect.setAttribute("x",x0); rect.setAttribute("y",y0); rect.setAttribute("width",w); rect.setAttribute("height",h); rect.setAttribute("fill","none"); rect.setAttribute("stroke","rgba(232,181,74,0.65)"); rect.setAttribute("stroke-width","1.5"); svg.appendChild(rect);
+    line(x0+w/3,y0,x0+w/3,y0+h,1); line(x0+2*w/3,y0,x0+2*w/3,y0+h,1);
+    line(x0,y0+h/3,x0+w,y0+h/3,1); line(x0,y0+2*h/3,x0+w,y0+2*h/3,1);
+    var dot=svgNS("circle"); dot.setAttribute("cx",x0+w/2); dot.setAttribute("cy",y0+h/2); dot.setAttribute("r",4); dot.setAttribute("fill","#e8b54a"); svg.appendChild(dot);
+  }
+  function drawLabels(){
+    var lay = $("fp-labels");
+    var old = lay.querySelectorAll(".fp-label,.fp-feat,.door-mark");
+    for(var i=0;i<old.length;i++) old[i].remove();
+    fp.rooms.forEach(function(rm){
+      if(!rm.cells.length) return;
+      var sr=0,sc=0; rm.cells.forEach(function(k){ var p=k.split(","); sr+=+p[0]; sc+=+p[1]; });
+      var r=sr/rm.cells.length, c=sc/rm.cells.length;
+      var el=document.createElement("div"); el.className="fp-label"; el.textContent=rm.label;
+      el.style.left=((c+0.5)*fp.cell)+"px"; el.style.top=((r+0.5)*fp.cell)+"px"; lay.appendChild(el);
+    });
+    fp.features.forEach(function(f){
+      var p=f.cell.split(","), r=+p[0], c=+p[1];
+      var el=document.createElement("div"); el.className="fp-feat"; el.textContent=shortFeat(f.type);
+      el.style.left=((c+0.5)*fp.cell)+"px"; el.style.top=((r+0.5)*fp.cell)+"px"; lay.appendChild(el);
+    });
+    drawDoor();
+  }
+  function drawDoor(){
+    var a = fpAnchor(); if(!a) return;
+    var lay = $("fp-labels");
+    var w = fp.cell*fp.cols, h = fp.cell*fp.rows, cx = w/2, cy = h/2;
+    var b = a.trueHeadingDeg*Math.PI/180, vx = Math.sin(b), vy = -Math.cos(b);
+    var sx = vx!==0 ? (w/2)/Math.abs(vx) : 1e9, sy = vy!==0 ? (h/2)/Math.abs(vy) : 1e9;
+    var s = Math.min(sx,sy), x = cx+vx*s, y = cy+vy*s;
+    var d = document.createElement("div"); d.className="door-mark"; d.textContent="▣"; d.title="Main entrance";
+    d.style.left = x+"px"; d.style.top = y+"px"; lay.appendChild(d);
+  }
+
+  function computeAll(){
+    var bb = paintedBBox();
+    var rooms = fp.rooms.map(function(rm){
+      var tally={}, zones=[];
+      rm.cells.forEach(function(k){ var p=k.split(","), z = bb ? zoneOfCell(+p[0],+p[1],bb) : "?"; tally[z]=(tally[z]||0)+1; });
+      var dom=null, max=-1; for(var z in tally){ zones.push(z); if(tally[z]>max){ max=tally[z]; dom=z; } }
+      return { label:rm.label, type:rm.type, cells:rm.cells.length, zone:dom, zonesSpanned:zones, answers:rm.answers };
+    });
+    var feats = fp.features.map(function(f){ var p=f.cell.split(","); return { type:f.type, name:featName(f.type), zone: bb ? zoneOfCell(+p[0],+p[1],bb) : "?" }; });
+    var fill = {};
+    if(bb){
+      var counts={}, totals={};
+      for(var r=bb.minR;r<=bb.maxR;r++) for(var c=bb.minC;c<=bb.maxC;c++){ var z=zoneOfCell(r,c,bb); totals[z]=(totals[z]||0)+1; if(cellOwner(r+","+c)) counts[z]=(counts[z]||0)+1; }
+      for(var zz in totals) fill[zz] = Math.round(100*(counts[zz]||0)/totals[zz]);
+    }
+    return { bbox:bb, rooms:rooms, features:feats, zoneFill:fill };
+  }
+
+  function renderPlanSVG(data){
+    var pad=22, cs=22;
+    var W=fp.cols*cs, H=fp.rows*cs;
+    var svgW=W+pad*2, svgH=H+pad*2+18;
+    var ox=pad, oy=pad+12;
+    var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+svgW+' '+svgH+'" font-family="Inter,sans-serif">';
+    s+='<rect width="'+svgW+'" height="'+svgH+'" fill="#0f1530"/>';
+    s+='<text x="'+(svgW/2)+'" y="15" fill="#e0563b" font-size="11" text-anchor="middle">N ↑ true north</text>';
+    fp.rooms.forEach(function(rm){ rm.cells.forEach(function(k){ var p=k.split(","),r=+p[0],c=+p[1];
+      s+='<rect x="'+(ox+c*cs)+'" y="'+(oy+r*cs)+'" width="'+cs+'" height="'+cs+'" fill="'+colorOf(rm.type)+'" fill-opacity="0.85" stroke="#0f1530" stroke-width="0.5"/>'; }); });
+    var bb=data.bbox;
+    if(bb){
+      var x0=ox+bb.minC*cs, y0=oy+bb.minR*cs, w=(bb.maxC-bb.minC+1)*cs, h=(bb.maxR-bb.minR+1)*cs;
+      s+='<rect x="'+x0+'" y="'+y0+'" width="'+w+'" height="'+h+'" fill="none" stroke="#e8b54a" stroke-opacity="0.7" stroke-width="1.2"/>';
+      [1,2].forEach(function(i){
+        s+='<line x1="'+(x0+w*i/3)+'" y1="'+y0+'" x2="'+(x0+w*i/3)+'" y2="'+(y0+h)+'" stroke="#e8b54a" stroke-opacity="0.4" stroke-dasharray="3 3"/>';
+        s+='<line x1="'+x0+'" y1="'+(y0+h*i/3)+'" x2="'+(x0+w)+'" y2="'+(y0+h*i/3)+'" stroke="#e8b54a" stroke-opacity="0.4" stroke-dasharray="3 3"/>';
+      });
+      s+='<circle cx="'+(x0+w/2)+'" cy="'+(y0+h/2)+'" r="3" fill="#e8b54a"/>';
+    }
+    fp.rooms.forEach(function(rm){ if(!rm.cells.length) return; var sr=0,sc=0; rm.cells.forEach(function(k){ var p=k.split(","); sr+=+p[0]; sc+=+p[1]; }); var r=sr/rm.cells.length,c=sc/rm.cells.length;
+      s+='<text x="'+(ox+(c+0.5)*cs)+'" y="'+(oy+(r+0.5)*cs+3)+'" fill="#10152e" font-size="8" font-weight="600" text-anchor="middle">'+esc(rm.label)+'</text>'; });
+    fp.features.forEach(function(f){ var p=f.cell.split(","),r=+p[0],c=+p[1];
+      s+='<text x="'+(ox+(c+0.5)*cs)+'" y="'+(oy+(r+0.5)*cs+3)+'" fill="#e8b54a" font-size="7" font-weight="700" text-anchor="middle">'+shortFeat(f.type)+'</text>'; });
+    s+='</svg>';
+    lastSVG=s; $("plan-svg").innerHTML=s;
+  }
+  function renderZoneTable(data){
+    var html = "<tr><th>Room</th><th>Zone</th><th>Detail</th></tr>";
+    data.rooms.forEach(function(r){
+      var a=[]; if(r.answers){ for(var k in r.answers){ if(r.answers[k]) a.push(r.answers[k]); } }
+      html += "<tr><td>"+esc(r.label)+"</td><td><span class='z'>"+(r.zone||"?")+"</span></td><td style='color:var(--muted)'>"+esc(a.join(", "))+"</td></tr>";
+    });
+    data.features.forEach(function(f){ html += "<tr><td>"+esc(f.name)+"</td><td><span class='z'>"+f.zone+"</span></td><td></td></tr>"; });
+    $("zone-table").innerHTML = html;
+  }
+  function showSummary(){
+    if(!fp.rooms.length || !paintedBBox()){ toast("Add at least one room first"); return; }
+    var data = computeAll();
+    renderPlanSVG(data); renderZoneTable(data);
+    var cuts=[]; for(var z in data.zoneFill){ if(z!=="Brahmasthan" && data.zoneFill[z] < 55) cuts.push(z); }
+    $("plan-note").innerHTML = (cuts.length ? "Possible missing / cut zones: <b style='color:var(--gold)'>"+cuts.join(", ")+"</b>. " : "Outline looks fairly regular. ") + "The Brahmasthan (center) should ideally stay open.";
+    showScreen("screen-fp-summary", 2); saveFP();
+  }
+  function fpExport(){
+    var data = computeAll(); var o = exportObj();
+    return {
+      tool:"Disha Vastu Map v1",
+      capturedAt:new Date().toISOString(),
+      orientation:o.entranceFacing,
+      location:o.location,
+      grid:{ cols:fp.cols, rows:fp.rows },
+      rooms:data.rooms,
+      features:data.features,
+      zoneFillPercent:data.zoneFill,
+      note:"Zones use the 9-part Vastu grid over the home's bounding box, true north up. Directions and details are observed, not judged \u2014 please analyse for doshas and remedies."
+    };
+  }
+  function dl(content,name,type){
+    var b = new Blob([content], {type:type});
+    var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000); toast("Saved "+name);
+  }
+
+  // floor-plan wiring
+  $("btn-to-fp").addEventListener("click", startFloorPlan);
+  $("cols+").addEventListener("click", function(){ if(fp.cols<24){ fp.cols++; $("cols-n").textContent=fp.cols; } });
+  $("cols-").addEventListener("click", function(){ if(fp.cols>4){ fp.cols--; $("cols-n").textContent=fp.cols; } });
+  $("rows+").addEventListener("click", function(){ if(fp.rows<24){ fp.rows++; $("rows-n").textContent=fp.rows; } });
+  $("rows-").addEventListener("click", function(){ if(fp.rows>4){ fp.rows--; $("rows-n").textContent=fp.rows; } });
+  $("fp-start").addEventListener("click", function(){ showScreen("screen-fp-edit",2); buildGrid(); renderChips(); setPaintMode(false); $("fp-banner").innerHTML="Tap <b>+ Add room</b> below to begin. Start with the room just inside your entrance."; });
+  $("fp-back-setup").addEventListener("click", function(){ showScreen("screen-fp-setup",2); });
+  $("tool-erase").addEventListener("click", toggleErase);
+  $("tool-feature").addEventListener("click", openFeaturePicker);
+  $("fp-done-room").addEventListener("click", doneRoom);
+  $("fp-finish").addEventListener("click", showSummary);
+  $("fp-edit-again").addEventListener("click", function(){ showScreen("screen-fp-edit",2); buildGrid(); renderChips(); });
+  $("fp-copy").addEventListener("click", function(){ var t=JSON.stringify(fpExport(),null,2); if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){ toast("Copied — paste into Claude"); }, function(){ toast("Copy failed"); }); } else { toast("Copy not supported"); } });
+  $("fp-download-json").addEventListener("click", function(){ dl(JSON.stringify(fpExport(),null,2), "vastu-map.json", "application/json"); });
+  $("fp-download-svg").addEventListener("click", function(){ dl(lastSVG, "vastu-plan.svg", "image/svg+xml"); });
+  $("modal-bg").addEventListener("click", function(e){ if(e.target===this) hideModal(); });
+  setupGridEvents();
 
   // keep arrow centered relative to map on resize
   window.addEventListener("resize", function(){ if(map) setTimeout(function(){ map.invalidateSize(); },150); });
