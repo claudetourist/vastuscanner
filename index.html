@@ -908,7 +908,7 @@
     var cells = $("fp-grid").children;
     for(var i=0;i<cells.length;i++){
       var d = cells[i], key = d.dataset.r+","+d.dataset.c, o = cellOwner(key);
-      d.style.background = o ? hexA(o.color,0.82) : "transparent";
+      d.style.background = o ? hexA(colorOf(o.type),0.82) : "transparent";
     }
   }
 
@@ -925,7 +925,7 @@
         var prev = cellOwner(key);
         if(prev && prev !== rm){ prev.cells.splice(prev.cells.indexOf(key),1); }
         if(rm.cells.indexOf(key) < 0) rm.cells.push(key);
-        t.style.background = hexA(rm.color,0.82);
+        t.style.background = hexA(colorOf(rm.type),0.82);
       }
     }
     drawZones(); drawLabels();
