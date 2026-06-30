@@ -185,6 +185,10 @@
   .zone-table td .z{color:var(--gold);font-weight:600}
   .svg-wrap{background:#0f1530;border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
   .svg-wrap svg{width:100%;height:auto;display:block}
+  .dir-pick{position:relative;width:206px;height:206px;margin:8px auto 2px;border:1px solid var(--line);border-radius:50%;background:var(--surface-2)}
+  .dir-dot{position:absolute;transform:translate(-50%,-50%);min-width:32px;text-align:center;border:1px solid var(--line-strong);background:var(--surface);border-radius:16px;padding:6px 8px;font-size:12px;font-weight:600;cursor:pointer}
+  .dir-dot.sel{background:var(--gold);color:#241a05;border-color:var(--gold)}
+  .dir-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--red);font-size:12px;font-weight:600;pointer-events:none}
 </style>
 </head>
 <body>
@@ -201,6 +205,12 @@
 
   <!-- START -->
   <section class="screen active" id="screen-start">
+    <div class="card" id="resume-card" style="display:none;border-color:var(--gold-deep)">
+      <p class="eyebrow">Saved session</p>
+      <h2 id="resume-line">Continue where you left off</h2>
+      <p>Your saved orientation is still here — jump straight to mapping rooms, or re-capture below.</p>
+      <button class="btn btn-primary" id="btn-resume">Continue with saved orientation →</button>
+    </div>
     <div class="card">
       <p class="eyebrow">What this does</p>
       <h2>Find true north for your front door</h2>
@@ -329,7 +339,10 @@
     </div>
     <div class="stepper"><span class="lab">Width (West ↔ East)</span><button id="cols-">−</button><span class="num" id="cols-n">10</span><button id="cols+">+</button></div>
     <div class="stepper"><span class="lab">Depth (North ↔ South)</span><button id="rows-">−</button><span class="num" id="rows-n">10</span><button id="rows+">+</button></div>
+    <button class="btn btn-primary" id="fp-resume" style="display:none">Resume saved plan</button>
     <button class="btn btn-primary" id="fp-start">Start adding rooms</button>
+    <button class="btn btn-ghost" id="fp-new" style="display:none">Start a new plan (clear saved)</button>
+    <p class="footnote" id="fp-saved-note" style="display:none"></p>
   </section>
 
   <!-- FLOOR PLAN: EDITOR -->
@@ -711,6 +724,7 @@
       "satellite bearing: <b>"+state.sat.toFixed(1)+"°</b><br>"+
       "lat,lng: <b>"+(state.lat!=null?state.lat.toFixed(5)+", "+state.lng.toFixed(5):"—")+"</b>";
 
+    saveAnchor();
     showScreen("screen-result", 2);
   }
 
@@ -825,6 +839,15 @@
 
   function saveFP(){ try{ localStorage.setItem("disha_fp", JSON.stringify({cols:fp.cols,rows:fp.rows,rooms:fp.rooms,features:fp.features,seq:fp.seq})); }catch(e){} }
   function loadFP(){ try{ var s=localStorage.getItem("disha_fp"); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  function saveAnchor(){ try{ localStorage.setItem("disha_anchor", JSON.stringify({sat:state.sat,compass:state.compass,samples:state.samplesUsed,lat:state.lat,lng:state.lng,source:state.source,rawAlpha:state.lastAlpha,screenAngle:state.screenAngle})); }catch(e){} }
+  function loadAnchor(){ try{ var s=localStorage.getItem("disha_anchor"); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  function restoreAnchor(){
+    var a=loadAnchor(); if(!a || a.sat==null) return false;
+    state.sat=a.sat; state.compass=(a.compass!=null?a.compass:null); state.samplesUsed=a.samples||0;
+    state.lat=(a.lat!=null?a.lat:null); state.lng=(a.lng!=null?a.lng:null);
+    state.source=a.source||"restored"; state.lastAlpha=(a.rawAlpha!=null?a.rawAlpha:null); state.screenAngle=a.screenAngle||0;
+    return true;
+  }
 
   function edgeWord(b){
     var map={"North":"top edge","North-East":"top-right corner","East":"right edge","South-East":"bottom-right corner",
@@ -833,11 +856,14 @@
   }
   function startFloorPlan(){
     var saved = loadFP();
-    if(saved && saved.rooms && saved.rooms.length){
-      if(window.confirm("Resume your saved floor plan?")){ fp.cols=saved.cols; fp.rows=saved.rows; fp.rooms=saved.rooms; fp.features=saved.features||[]; fp.seq=saved.seq||(fp.rooms.length+1); }
-    }
-    var a = fpAnchor();
+    var hasSaved = !!(saved && saved.rooms && saved.rooms.length);
+    $("fp-resume").style.display = hasSaved ? "block" : "none";
+    $("fp-new").style.display = hasSaved ? "block" : "none";
+    $("fp-start").style.display = hasSaved ? "none" : "block";
+    $("fp-saved-note").style.display = hasSaved ? "block" : "none";
+    if(hasSaved) $("fp-saved-note").textContent = "Saved plan: " + saved.rooms.length + " room(s). Resume keeps it; a new plan clears it.";
     $("cols-n").textContent = fp.cols; $("rows-n").textContent = fp.rows;
+    var a = fpAnchor();
     if(a){
       $("fp-anchor-line").textContent = "Entrance faces " + a.vastuDirection + " (" + a.vastuSanskrit + ")";
       $("fp-entrance-hint").innerHTML = "Your entrance faces <b style='color:var(--gold)'>" + a.vastuDirection + "</b>, so it sits on the " + edgeWord(a.trueHeadingDeg) + " of the grid (marked).";
@@ -845,6 +871,17 @@
       $("fp-entrance-hint").textContent = "Place rooms relative to the compass labels around the grid.";
     }
     showScreen("screen-fp-setup", 2);
+  }
+  function startEditorFresh(){
+    fp.rooms = []; fp.features = []; fp.seq = 1; fp.curId = null; fp.mode = "idle";
+    showScreen("screen-fp-edit", 2); buildGrid(); renderChips(); setPaintMode(false);
+    $("fp-banner").innerHTML = "Tap <b>+ Add room</b> below to begin. Start with the room just inside your entrance.";
+  }
+  function resumeEditor(){
+    var s = loadFP(); if(s){ fp.cols=s.cols; fp.rows=s.rows; fp.rooms=s.rooms; fp.features=s.features||[]; fp.seq=s.seq||(fp.rooms.length+1); }
+    fp.curId=null; fp.mode="idle"; $("cols-n").textContent=fp.cols; $("rows-n").textContent=fp.rows;
+    showScreen("screen-fp-edit", 2); buildGrid(); renderChips(); setPaintMode(false);
+    $("fp-banner").innerHTML = "Resumed. Add a room, or tap any chip to edit it.";
   }
 
   function sizeStage(){
@@ -945,30 +982,48 @@
     $("fp-banner").innerHTML = "Room saved. Add the next room, or tap <b>Finish</b> when the whole home is mapped.";
     renderChips(); saveFP();
   }
+  var DIRMAP = {"N":0,"NNE":22.5,"NE":45,"ENE":67.5,"E":90,"ESE":112.5,"SE":135,"SSE":157.5,"S":180,"SSW":202.5,"SW":225,"WSW":247.5,"W":270,"WNW":292.5,"NW":315,"NNW":337.5,
+    "North":0,"East":90,"South":180,"West":270,"North-East":45,"South-East":135,"South-West":225,"North-West":315};
+  function isDir(v){ return DIRMAP.hasOwnProperty(v); }
+  function renderQ(q){
+    var dirs=[], others=[];
+    q.o.forEach(function(v){ (isDir(v)?dirs:others).push(v); });
+    var h = '<div class="q" data-q="'+q.id+'"><span class="qt">'+q.q+'</span>';
+    if(dirs.length>=3){
+      h += '<div class="dir-pick">';
+      dirs.forEach(function(v){
+        var a = DIRMAP[v]*Math.PI/180, x = 50 + 40*Math.sin(a), y = 50 - 40*Math.cos(a);
+        h += '<div class="dir-dot pick" data-v="'+esc(v)+'" style="left:'+x+'%;top:'+y+'%">'+v+'</div>';
+      });
+      h += '<div class="dir-center">N↑</div></div>';
+      if(others.length){ h += '<div class="q-opts" style="justify-content:center;margin-top:8px">'; others.forEach(function(v){ h += '<div class="q-opt pick" data-v="'+esc(v)+'">'+v+'</div>'; }); h += '</div>'; }
+    } else {
+      h += '<div class="q-opts">'; q.o.forEach(function(v){ h += '<div class="q-opt pick" data-v="'+esc(v)+'">'+v+'</div>'; }); h += '</div>';
+    }
+    return h + '</div>';
+  }
   function openQuestions(rm){
     var qs = QSETS[rm.type];
     if(!qs){ finalizeRoom(); return; }
+    var anyDir = qs.some(function(q){ return q.o.filter(isDir).length >= 3; });
     var html = '<h3>'+nameOf(rm.type)+' — quick Vastu details</h3>';
-    for(var i=0;i<qs.length;i++){ var q = qs[i];
-      html += '<div class="q" data-q="'+q.id+'"><span class="qt">'+q.q+'</span><div class="q-opts">';
-      for(var j=0;j<q.o.length;j++) html += '<div class="q-opt" data-v="'+esc(q.o[j])+'">'+q.o[j]+'</div>';
-      html += '</div></div>';
-    }
+    if(anyDir) html += '<p style="margin:-6px 0 4px;color:var(--muted);font-size:13px">Tap the spot on the compass — North is up, matching your floor-plan grid.</p>';
+    for(var i=0;i<qs.length;i++) html += renderQ(qs[i]);
     html += '<button class="btn btn-primary" id="q-save">Save room</button>';
     showModal(html);
     var groups = $("modal").querySelectorAll(".q");
     groups.forEach(function(g){
       var pre = rm.answers[g.dataset.q];
-      g.querySelectorAll(".q-opt").forEach(function(o){
+      g.querySelectorAll(".pick").forEach(function(o){
         if(pre && o.dataset.v===pre) o.classList.add("sel");
         o.addEventListener("click", function(){
-          g.querySelectorAll(".q-opt").forEach(function(x){ x.classList.remove("sel"); });
+          g.querySelectorAll(".pick").forEach(function(x){ x.classList.remove("sel"); });
           this.classList.add("sel");
         });
       });
     });
     $("q-save").addEventListener("click", function(){
-      groups.forEach(function(g){ var s = g.querySelector(".q-opt.sel"); rm.answers[g.dataset.q] = s ? s.dataset.v : null; });
+      groups.forEach(function(g){ var s = g.querySelector(".pick.sel"); rm.answers[g.dataset.q] = s ? s.dataset.v : null; });
       hideModal(); finalizeRoom();
     });
   }
@@ -1029,8 +1084,10 @@
   function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg", tag); }
   function drawZones(){
     var svg = $("fp-zones"); svg.innerHTML = "";
-    var w2 = fp.cell*fp.cols;
+    var w2 = fp.cell*fp.cols, h2 = fp.cell*fp.rows;
     var nl = svgNS("text"); nl.setAttribute("x", w2/2); nl.setAttribute("y", 11); nl.setAttribute("fill","#e0563b"); nl.setAttribute("font-size","11"); nl.setAttribute("text-anchor","middle"); nl.textContent = "N ↑"; svg.appendChild(nl);
+    function edge(t,x,y){ var e=svgNS("text"); e.setAttribute("x",x); e.setAttribute("y",y); e.setAttribute("fill","rgba(243,237,224,0.5)"); e.setAttribute("font-size","10"); e.setAttribute("text-anchor","middle"); e.setAttribute("dominant-baseline","middle"); e.textContent=t; svg.appendChild(e); }
+    edge("E", w2-8, h2/2); edge("W", 9, h2/2); edge("S", w2/2, h2-7);
     var bb = paintedBBox(); if(!bb) return;
     var x0 = bb.minC*fp.cell, y0 = bb.minR*fp.cell;
     var w = (bb.maxC-bb.minC+1)*fp.cell, h = (bb.maxR-bb.minR+1)*fp.cell;
@@ -1158,7 +1215,9 @@
   $("cols-").addEventListener("click", function(){ if(fp.cols>4){ fp.cols--; $("cols-n").textContent=fp.cols; } });
   $("rows+").addEventListener("click", function(){ if(fp.rows<24){ fp.rows++; $("rows-n").textContent=fp.rows; } });
   $("rows-").addEventListener("click", function(){ if(fp.rows>4){ fp.rows--; $("rows-n").textContent=fp.rows; } });
-  $("fp-start").addEventListener("click", function(){ showScreen("screen-fp-edit",2); buildGrid(); renderChips(); setPaintMode(false); $("fp-banner").innerHTML="Tap <b>+ Add room</b> below to begin. Start with the room just inside your entrance."; });
+  $("fp-start").addEventListener("click", startEditorFresh);
+  $("fp-resume").addEventListener("click", resumeEditor);
+  $("fp-new").addEventListener("click", function(){ if(window.confirm("Clear the saved plan and start fresh?")){ try{ localStorage.removeItem("disha_fp"); }catch(e){} startEditorFresh(); } });
   $("fp-back-setup").addEventListener("click", function(){ showScreen("screen-fp-setup",2); });
   $("tool-erase").addEventListener("click", toggleErase);
   $("tool-feature").addEventListener("click", openFeaturePicker);
@@ -1170,6 +1229,14 @@
   $("fp-download-svg").addEventListener("click", function(){ dl(lastSVG, "vastu-plan.svg", "image/svg+xml"); });
   $("modal-bg").addEventListener("click", function(e){ if(e.target===this) hideModal(); });
   setupGridEvents();
+
+  // On load: if a saved orientation exists, offer to jump straight to mapping
+  $("btn-resume").addEventListener("click", startFloorPlan);
+  if(restoreAnchor()){
+    $("resume-card").style.display = "block";
+    var ra = fpAnchor();
+    if(ra) $("resume-line").textContent = "Saved: entrance faces " + ra.vastuDirection + " (" + ra.vastuSanskrit + ")";
+  }
 
   // keep arrow centered relative to map on resize
   window.addEventListener("resize", function(){ if(map) setTimeout(function(){ map.invalidateSize(); },150); });
