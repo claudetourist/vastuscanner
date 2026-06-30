@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1530" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Disha" />
+<title>Disha — Entrance North Finder</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0f1530;
+    --surface:#1a2244;
+    --surface-2:#222c54;
+    --ink:#f3ede0;
+    --muted:#9aa3c4;
+    --gold:#e8b54a;
+    --gold-deep:#c8902f;
+    --red:#e0563b;
+    --good:#5fb87a;
+    --warn:#e8b54a;
+    --bad:#e0563b;
+    --line:rgba(243,237,224,0.12);
+    --line-strong:rgba(243,237,224,0.22);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+  body{min-height:100dvh;display:flex;flex-direction:column}
+  .wrap{flex:1;width:100%;max-width:520px;margin:0 auto;padding:20px 18px 36px;
+    display:flex;flex-direction:column;gap:18px;
+    padding-bottom:calc(36px + env(safe-area-inset-bottom));
+    padding-top:calc(20px + env(safe-area-inset-top))}
+
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{font-family:Marcellus,serif;font-size:26px;font-weight:400;margin:0;letter-spacing:.5px}
+  .brand .sub{color:var(--muted);font-size:12px;letter-spacing:1.5px;text-transform:uppercase}
+
+  .steps{display:flex;gap:6px;margin-top:2px}
+  .steps .dot{height:3px;flex:1;border-radius:2px;background:var(--line)}
+  .steps .dot.on{background:var(--gold)}
+
+  .screen{display:none;flex-direction:column;gap:18px;animation:fade .35s ease}
+  .screen.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .eyebrow{color:var(--gold);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:0 0 8px}
+  h2{font-family:Marcellus,serif;font-weight:400;font-size:22px;margin:0 0 10px;line-height:1.2}
+  p{margin:0 0 12px;color:var(--muted);font-size:15px;line-height:1.55}
+  p:last-child{margin-bottom:0}
+  .ink{color:var(--ink)}
+  strong{color:var(--ink);font-weight:600}
+
+  ol.guide{margin:0;padding-left:0;list-style:none;counter-reset:g;display:flex;flex-direction:column;gap:12px}
+  ol.guide li{counter-increment:g;display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:1.5;color:var(--ink)}
+  ol.guide li::before{content:counter(g);flex:0 0 26px;height:26px;border-radius:50%;
+    background:var(--surface-2);border:1px solid var(--gold-deep);color:var(--gold);
+    font-size:13px;font-weight:600;display:grid;place-items:center;margin-top:1px}
+
+  .btn{appearance:none;border:0;width:100%;padding:16px;border-radius:14px;font-family:Inter;
+    font-size:16px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
+  .btn-primary{background:var(--gold);color:#241a05}
+  .btn-primary:active{background:var(--gold-deep)}
+  .btn-primary:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed}
+  .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong)}
+  .btn-ghost:active{background:var(--surface)}
+  .btn-row{display:flex;gap:10px}
+  .btn-row .btn{flex:1}
+
+  /* Compass */
+  .compass-wrap{position:relative;width:min(78vw,300px);aspect-ratio:1;margin:6px auto 2px}
+  .pointer{position:absolute;top:-2px;left:50%;transform:translateX(-50%);z-index:3;
+    width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;
+    border-top:18px solid var(--gold);filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+  .rose{position:absolute;inset:0;transition:transform .08s linear;will-change:transform}
+  .rose svg{width:100%;height:100%;display:block}
+  .compass-center{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:2;pointer-events:none}
+  .deg{font-family:Marcellus,serif;font-size:46px;line-height:1;font-variant-numeric:tabular-nums}
+  .card-dir{font-size:13px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-top:6px}
+  .hint-cal{text-align:center;color:var(--muted);font-size:13px;margin:2px 0 0}
+
+  .captured{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--surface-2);border:1px solid var(--gold-deep);border-radius:12px;
+    padding:12px 16px;font-size:14px}
+  .captured .v{font-family:Marcellus,serif;font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums}
+
+  /* Map */
+  #map{height:46vh;min-height:300px;border-radius:16px;border:1px solid var(--line-strong);overflow:hidden;z-index:0}
+  .map-shell{position:relative}
+  .arrow-overlay{position:absolute;inset:0;z-index:500;pointer-events:none;display:grid;place-items:center}
+  .arrow-overlay svg{width:60%;height:60%;overflow:visible}
+  .knob{pointer-events:auto;cursor:grab;touch-action:none}
+  .knob:active{cursor:grabbing}
+  .map-hud{position:absolute;left:12px;bottom:12px;z-index:600;background:rgba(15,21,48,.86);
+    border:1px solid var(--line-strong);border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(4px)}
+  .map-hud b{font-family:Marcellus,serif;color:var(--gold);font-size:17px;font-variant-numeric:tabular-nums}
+  .locate{position:absolute;right:12px;top:12px;z-index:600;background:rgba(15,21,48,.86);
+    border:1px solid var(--line-strong);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .fine{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+  input[type=range]{flex:1;accent-color:var(--gold)}
+
+  /* Result */
+  .result-rows{display:flex;flex-direction:column;gap:1px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .rrow{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);padding:14px 16px}
+  .rrow .k{color:var(--muted);font-size:14px}
+  .rrow .val{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+  .facing-big{text-align:center;padding:6px 0 4px}
+  .facing-big .name{font-family:Marcellus,serif;font-size:30px}
+  .facing-big .sans{color:var(--gold);font-size:14px;letter-spacing:2px;margin-top:4px}
+  .facing-big .num{color:var(--muted);font-size:13px;margin-top:6px;font-variant-numeric:tabular-nums}
+
+  .verdict{border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.5;border:1px solid}
+  .verdict .lbl{font-weight:600;display:block;margin-bottom:3px}
+  .v-good{background:rgba(95,184,122,.1);border-color:rgba(95,184,122,.4)}
+  .v-good .lbl{color:var(--good)}
+  .v-warn{background:rgba(232,181,74,.1);border-color:rgba(232,181,74,.4)}
+  .v-warn .lbl{color:var(--warn)}
+  .v-bad{background:rgba(224,86,59,.1);border-color:rgba(224,86,59,.4)}
+  .v-bad .lbl{color:var(--bad)}
+
+  details.adv{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 16px}
+  details.adv summary{cursor:pointer;padding:14px 0;font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;list-style:none}
+  details.adv summary::-webkit-details-marker{display:none}
+  details.adv[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+  .diag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7;color:var(--muted);padding-bottom:14px}
+  .diag b{color:var(--ink)}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:var(--gold);color:#241a05;padding:11px 20px;border-radius:30px;font-size:14px;font-weight:600;
+    opacity:0;transition:.25s;z-index:999;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .err{color:var(--bad);font-size:13px;margin-top:8px}
+  .footnote{text-align:center;color:var(--muted);font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1>Disha</h1>
+    <span class="sub">Entrance North Finder</span>
+  </div>
+  <div class="steps">
+    <div class="dot" id="d0"></div>
+    <div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div>
+  </div>
+
+  <!-- START -->
+  <section class="screen active" id="screen-start">
+    <div class="card">
+      <p class="eyebrow">What this does</p>
+      <h2>Find true north for your front door</h2>
+      <p>This pins the exact direction your main entrance faces — the one number every Vastu reading hangs on. It checks two ways and compares them, so you can trust the result:</p>
+      <ol class="guide">
+        <li><span><strong>Your phone's compass</strong>, read right at the doorway.</span></li>
+        <li><span><strong>A satellite view</strong>, where you point an arrow the way your door faces.</span></li>
+      </ol>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Before you start</p>
+      <p class="ink">Stand at your <strong>main entrance</strong>. Step just outside if you can — metal gates, the fridge, and wiring confuse phone compasses, and a few steps out gives a cleaner reading.</p>
+      <p>You'll be asked to allow <strong>motion</strong> and <strong>location</strong> access. Both stay on your phone; nothing is sent anywhere.</p>
+    </div>
+    <button class="btn btn-primary" id="btn-begin">Allow access &amp; begin</button>
+    <p class="err" id="start-err" style="display:none"></p>
+    <p class="footnote">Works fully offline once loaded. Needs no account.</p>
+  </section>
+
+  <!-- COMPASS -->
+  <section class="screen" id="screen-compass">
+    <div class="card">
+      <p class="eyebrow">Step 1 of 3 · Compass</p>
+      <h2>Aim out the door, then capture</h2>
+      <p class="ink">Hold the phone <strong>flat in your palm</strong>, screen up. Turn so the <strong>top edge points straight out</strong> the door — the way you'd walk out. Keep it level and steady.</p>
+
+      <div class="compass-wrap">
+        <div class="pointer"></div>
+        <div class="rose" id="rose"></div>
+        <div class="compass-center">
+          <div class="deg" id="live-deg">––°</div>
+          <div class="card-dir" id="live-dir">waiting</div>
+        </div>
+      </div>
+      <p class="hint-cal" id="cal-hint">Wave the phone in a figure-8 a few times to calibrate.</p>
+    </div>
+
+    <button class="btn btn-primary" id="btn-capture">Hold steady &amp; capture (2s)</button>
+
+    <div class="captured" id="captured-box" style="display:none">
+      <span>Captured heading</span>
+      <span class="v" id="captured-val">––°</span>
+    </div>
+
+    <div class="btn-row" id="compass-nav" style="display:none">
+      <button class="btn btn-ghost" id="btn-recapture">Redo</button>
+      <button class="btn btn-primary" id="btn-to-map">Next: satellite</button>
+    </div>
+    <p class="err" id="compass-err" style="display:none"></p>
+  </section>
+
+  <!-- SATELLITE -->
+  <section class="screen" id="screen-satellite">
+    <div class="card" style="padding-bottom:14px">
+      <p class="eyebrow">Step 2 of 3 · Satellite</p>
+      <h2>Point the arrow out your door</h2>
+      <p>Pinch and drag to find your home from above. Then drag the <strong style="color:var(--gold)">gold knob</strong> so the arrow points the exact way your front door faces.</p>
+    </div>
+
+    <div class="map-shell">
+      <div id="map"></div>
+      <button class="locate" id="btn-locate">◎ My location</button>
+      <div class="arrow-overlay" id="arrow-overlay">
+        <svg viewBox="-50 -60 100 120">
+          <line x1="0" y1="40" x2="0" y2="-30" stroke="#e8b54a" stroke-width="5" stroke-linecap="round"/>
+          <path d="M0,-46 L11,-26 L0,-32 L-11,-26 Z" fill="#e8b54a"/>
+          <circle cx="0" cy="40" r="6" fill="#0f1530" stroke="#e8b54a" stroke-width="3"/>
+          <circle class="knob" id="knob" cx="0" cy="-46" r="20" fill="rgba(232,181,74,0.001)" stroke="#e8b54a" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="map-hud">Door faces <b id="arrow-deg">0°</b> <span id="arrow-card"></span></div>
+    </div>
+
+    <div class="fine">
+      <span>Fine-tune</span>
+      <input type="range" id="arrow-range" min="0" max="359" value="0" />
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-back-compass">Back</button>
+      <button class="btn btn-primary" id="btn-to-result">Use this facing</button>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="screen-result">
+    <div class="card">
+      <p class="eyebrow">Step 3 of 3 · Result</p>
+      <div class="facing-big">
+        <div class="name" id="res-name">—</div>
+        <div class="sans" id="res-sans">—</div>
+        <div class="num" id="res-num">—</div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"><span class="lbl" id="verdict-lbl"></span><span id="verdict-txt"></span></div>
+
+    <div class="result-rows">
+      <div class="rrow"><span class="k">Satellite (true north)</span><span class="val" id="r-sat">—</span></div>
+      <div class="rrow"><span class="k">Phone compass</span><span class="val" id="r-comp">—</span></div>
+      <div class="rrow"><span class="k">Difference</span><span class="val" id="r-diff">—</span></div>
+      <div class="rrow"><span class="k">Apparent declination</span><span class="val" id="r-decl">—</span></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-copy">Copy data</button>
+      <button class="btn btn-primary" id="btn-download">Download .json</button>
+    </div>
+    <button class="btn btn-ghost" id="btn-restart">Start over</button>
+
+    <details class="adv">
+      <summary>Advanced · raw sensor data</summary>
+      <div class="diag" id="diag">No data yet.</div>
+    </details>
+
+    <p class="footnote">This anchor file is what feeds the full Vastu map next.</p>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- helpers ---------- */
+  var CARD16 = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  var VASTU = [
+    {dir:"North",      sans:"Uttara"},
+    {dir:"North-East", sans:"Ishanya"},
+    {dir:"East",       sans:"Purva"},
+    {dir:"South-East", sans:"Agneya"},
+    {dir:"South",      sans:"Dakshina"},
+    {dir:"South-West", sans:"Nairutya"},
+    {dir:"West",       sans:"Paschim"},
+    {dir:"North-West", sans:"Vayavya"}
+  ];
+  function norm360(d){ d = d % 360; return d < 0 ? d + 360 : d; }
+  function signed180(d){ return ((d % 360) + 540) % 360 - 180; }
+  function angleDiff(a,b){ return Math.abs(signed180(a - b)); }
+  function card16(deg){ return CARD16[Math.round(norm360(deg)/22.5) % 16]; }
+  function vastuOf(deg){ return VASTU[Math.floor((norm360(deg + 22.5)) / 45) % 8]; }
+  function circularMean(arr){
+    var s=0,c=0,r;
+    for(var i=0;i<arr.length;i++){ r=arr[i]*Math.PI/180; s+=Math.sin(r); c+=Math.cos(r); }
+    return norm360(Math.atan2(s/arr.length, c/arr.length)*180/Math.PI);
+  }
+
+  /* ---------- state ---------- */
+  var state = {
+    compass:null, samplesUsed:0,
+    sat:null, lat:null, lng:null,
+    lastAlpha:null, source:"none", screenAngle:0, eventCount:0
+  };
+  var live = null, capturing = false, buffer = [];
+
+  function $(id){ return document.getElementById(id); }
+  function showScreen(id, stepIdx){
+    var s = document.querySelectorAll(".screen");
+    for(var i=0;i<s.length;i++) s[i].classList.remove("active");
+    $(id).classList.add("active");
+    ["d0","d1","d2"].forEach(function(d,i){ $(d).classList.toggle("on", i<=stepIdx); });
+    window.scrollTo(0,0);
+  }
+  var toastTimer;
+  function toast(msg){
+    var t=$("toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove("show"); },1600);
+  }
+
+  /* ---------- compass rose ---------- */
+  (function buildRose(){
+    var ns="http://www.w3.org/2000/svg";
+    var svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox","0 0 200 200");
+    var cx=100,cy=100;
+    // ticks
+    for(var a=0;a<360;a+=5){
+      var major=(a%45===0), len=major?13:(a%15===0?9:5);
+      var rad=a*Math.PI/180;
+      var x1=cx+Math.sin(rad)*92, y1=cy-Math.cos(rad)*92;
+      var x2=cx+Math.sin(rad)*(92-len), y2=cy-Math.cos(rad)*(92-len);
+      var ln=document.createElementNS(ns,"line");
+      ln.setAttribute("x1",x1.toFixed(1)); ln.setAttribute("y1",y1.toFixed(1));
+      ln.setAttribute("x2",x2.toFixed(1)); ln.setAttribute("y2",y2.toFixed(1));
+      ln.setAttribute("stroke", a===0 ? "#e0563b" : "rgba(243,237,224,0.4)");
+      ln.setAttribute("stroke-width", major?2:1);
+      svg.appendChild(ln);
+    }
+    var pts=[["N",0,"#e0563b"],["NE",45],["E",90],["SE",135],["S",180],["SW",225],["W",270],["NW",315]];
+    pts.forEach(function(p){
+      var rad=p[1]*Math.PI/180, r=(p[0].length===1?68:62);
+      var t=document.createElementNS(ns,"text");
+      t.setAttribute("x",(cx+Math.sin(rad)*r).toFixed(1));
+      t.setAttribute("y",(cy-Math.cos(rad)*r).toFixed(1));
+      t.setAttribute("text-anchor","middle"); t.setAttribute("dominant-baseline","central");
+      t.setAttribute("font-family","Marcellus,serif");
+      t.setAttribute("font-size", p[0].length===1?18:12);
+      t.setAttribute("fill", p[2] || "#f3ede0");
+      t.textContent=p[0];
+      svg.appendChild(t);
+    });
+    var ring=document.createElementNS(ns,"circle");
+    ring.setAttribute("cx",cx); ring.setAttribute("cy",cy); ring.setAttribute("r",92);
+    ring.setAttribute("fill","none"); ring.setAttribute("stroke","rgba(243,237,224,0.12)"); ring.setAttribute("stroke-width","1");
+    svg.appendChild(ring);
+    $("rose").appendChild(svg);
+  })();
+
+  /* ---------- sensors ---------- */
+  function readScreenAngle(){
+    try{
+      if(screen.orientation && typeof screen.orientation.angle==="number") return screen.orientation.angle;
+      if(typeof window.orientation==="number") return window.orientation;
+    }catch(e){}
+    return 0;
+  }
+  function headingFromEvent(e){
+    state.screenAngle = readScreenAngle();
+    if(typeof e.webkitCompassHeading === "number" && !isNaN(e.webkitCompassHeading)){
+      state.source = "iOS webkitCompassHeading";
+      state.lastAlpha = e.alpha;
+      return norm360(e.webkitCompassHeading + state.screenAngle);
+    }
+    if(e.alpha != null){
+      state.source = e.absolute ? "deviceorientationabsolute" : "deviceorientation";
+      state.lastAlpha = e.alpha;
+      return norm360(360 - e.alpha + state.screenAngle);
+    }
+    return null;
+  }
+  function onOrient(e){
+    var h = headingFromEvent(e);
+    if(h == null) return;
+    state.eventCount++;
+    live = h;
+    $("rose").style.transform = "rotate(" + (-h) + "deg)";
+    $("live-deg").textContent = Math.round(h) + "°";
+    $("live-dir").textContent = card16(h);
+    if($("cal-hint").style.display !== "none" && state.eventCount > 6){
+      $("cal-hint").style.display = "none";
+    }
+    if(capturing) buffer.push(h);
+  }
+
+  function attachOrientation(){
+    window.addEventListener("deviceorientationabsolute", onOrient, true);
+    window.addEventListener("deviceorientation", onOrient, true);
+  }
+
+  function begin(){
+    $("start-err").style.display = "none";
+    var needIOS = (typeof DeviceOrientationEvent !== "undefined" &&
+                   typeof DeviceOrientationEvent.requestPermission === "function");
+    var chain = Promise.resolve("granted");
+    if(needIOS) chain = DeviceOrientationEvent.requestPermission();
+
+    chain.then(function(res){
+      if(res === "denied"){
+        $("start-err").textContent = "Motion access was blocked. Enable it in your browser settings, then reload.";
+        $("start-err").style.display = "block";
+        return;
+      }
+      attachOrientation();
+      // location is requested lazily on the map step, but kick it off now to warm up
+      tryGeolocate(function(){}, true);
+      showScreen("screen-compass", 0);
+      // safety: if no sensor events arrive, tell the user
+      setTimeout(function(){
+        if(state.eventCount === 0){
+          $("compass-err").textContent = "No compass data yet. This needs an https page on a phone with a magnetometer — see the setup notes if the dial isn't moving.";
+          $("compass-err").style.display = "block";
+        }
+      }, 3500);
+    }).catch(function(){
+      $("start-err").textContent = "Couldn't request motion access. Make sure you opened this over https.";
+      $("start-err").style.display = "block";
+    });
+  }
+
+  /* ---------- capture ---------- */
+  function startCapture(){
+    if(live == null){
+      $("compass-err").textContent = "Waiting for the compass — move the phone a little first.";
+      $("compass-err").style.display = "block";
+      return;
+    }
+    $("compass-err").style.display = "none";
+    buffer = []; capturing = true;
+    var btn = $("btn-capture"); btn.disabled = true;
+    var left = 2;
+    btn.textContent = "Hold still… " + left;
+    var iv = setInterval(function(){
+      left--; if(left>0) btn.textContent = "Hold still… " + left;
+    }, 1000);
+    setTimeout(function(){
+      clearInterval(iv); capturing = false; btn.disabled = false;
+      btn.textContent = "Hold steady & capture (2s)";
+      if(buffer.length < 3){
+        $("compass-err").textContent = "Didn't get a stable reading. Try again, keeping the phone level.";
+        $("compass-err").style.display = "block";
+        return;
+      }
+      state.compass = circularMean(buffer);
+      state.samplesUsed = buffer.length;
+      $("captured-val").textContent = Math.round(state.compass) + "° " + card16(state.compass);
+      $("captured-box").style.display = "flex";
+      $("compass-nav").style.display = "flex";
+      $("btn-capture").style.display = "none";
+    }, 2000);
+  }
+  function recapture(){
+    $("captured-box").style.display = "none";
+    $("compass-nav").style.display = "none";
+    $("btn-capture").style.display = "block";
+  }
+
+  /* ---------- map + arrow ---------- */
+  var map=null, arrowDeg=0, dragging=false, mapReady=false;
+  var FALLBACK=[19.2215,73.1645]; // Ulhasnagar area
+
+  function initMap(){
+    if(mapReady) return;
+    map = L.map("map",{ zoomControl:true, attributionControl:true }).setView(FALLBACK, 17);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{
+      maxZoom:21, attribution:"Imagery © Esri"
+    }).addTo(map);
+    mapReady = true;
+    setTimeout(function(){ map.invalidateSize(); }, 100);
+    if(state.lat != null) map.setView([state.lat, state.lng], 19);
+    setupArrowDrag();
+    setArrow(arrowDeg);
+  }
+  function setArrow(deg){
+    arrowDeg = norm360(deg);
+    $("arrow-overlay").querySelector("svg").style.transform = "rotate(" + arrowDeg + "deg)";
+    $("arrow-deg").textContent = Math.round(arrowDeg) + "°";
+    $("arrow-card").textContent = card16(arrowDeg);
+    $("arrow-range").value = Math.round(arrowDeg);
+  }
+  function setupArrowDrag(){
+    var knob = $("knob");
+    function bearingFromPoint(clientX, clientY){
+      var r = $("map").getBoundingClientRect();
+      var cx = r.left + r.width/2, cy = r.top + r.height/2;
+      return norm360(Math.atan2(clientX - cx, -(clientY - cy)) * 180/Math.PI);
+    }
+    knob.addEventListener("pointerdown", function(ev){
+      dragging = true; ev.preventDefault();
+      try{ knob.setPointerCapture(ev.pointerId); }catch(e){}
+    });
+    window.addEventListener("pointermove", function(ev){
+      if(!dragging) return;
+      setArrow(bearingFromPoint(ev.clientX, ev.clientY));
+    });
+    window.addEventListener("pointerup", function(){ dragging = false; });
+    $("arrow-range").addEventListener("input", function(){ setArrow(parseInt(this.value,10)); });
+  }
+
+  /* ---------- geolocation ---------- */
+  function tryGeolocate(done, silent){
+    if(!navigator.geolocation){ if(!silent) toast("Location not available"); done&&done(); return; }
+    navigator.geolocation.getCurrentPosition(function(pos){
+      state.lat = pos.coords.latitude; state.lng = pos.coords.longitude;
+      if(mapReady && map){ map.setView([state.lat, state.lng], 19); }
+      done && done(true);
+    }, function(){
+      if(!silent) toast("Couldn't get location — pan the map to your home");
+      done && done(false);
+    }, { enableHighAccuracy:true, timeout:8000, maximumAge:10000 });
+  }
+
+  /* ---------- result ---------- */
+  function buildResult(){
+    state.sat = arrowDeg;
+    var anchor = state.sat;                 // satellite = interference-free true north
+    var v = vastuOf(anchor);
+    $("res-name").textContent = v.dir;
+    $("res-sans").textContent = v.sans + "-mukhi";
+    $("res-num").textContent = Math.round(anchor) + "° from true north · " + card16(anchor);
+
+    $("r-sat").textContent = Math.round(state.sat) + "° " + card16(state.sat);
+
+    var diff = null, decl = null;
+    if(state.compass != null){
+      diff = angleDiff(state.compass, state.sat);
+      decl = signed180(state.sat - state.compass);
+      $("r-comp").textContent = Math.round(state.compass) + "° " + card16(state.compass);
+      $("r-diff").textContent = Math.round(diff) + "°";
+      $("r-decl").textContent = (decl>=0?"+":"") + Math.round(decl) + "° " + (decl>=0?"E":"W");
+    } else {
+      $("r-comp").textContent = "not captured";
+      $("r-diff").textContent = "—";
+      $("r-decl").textContent = "—";
+    }
+
+    var vEl=$("verdict"), lbl=$("verdict-lbl"), txt=$("verdict-txt");
+    vEl.className = "verdict";
+    if(diff == null){
+      vEl.classList.add("v-warn"); lbl.textContent="Compass skipped";
+      txt.textContent="Using the satellite alignment alone. Good enough to start, but capturing the compass too lets you cross-check.";
+    } else if(diff <= 7){
+      vEl.classList.add("v-good"); lbl.textContent="Strong match";
+      txt.textContent="Both methods agree closely. High confidence in this orientation.";
+    } else if(diff <= 18){
+      vEl.classList.add("v-warn"); lbl.textContent="Reasonable match";
+      txt.textContent="A modest gap — partly normal magnetic declination. The satellite value is the safer anchor.";
+    } else {
+      vEl.classList.add("v-bad"); lbl.textContent="Big gap — trust the satellite";
+      txt.textContent="Your phone compass is likely reading metal or wiring at the door. Re-take it a few steps outside, away from the frame. The satellite arrow is being used as the anchor.";
+    }
+
+    $("diag").innerHTML =
+      "source: <b>"+state.source+"</b><br>"+
+      "raw alpha: <b>"+(state.lastAlpha!=null?state.lastAlpha.toFixed(1):"null")+"°</b><br>"+
+      "screen angle: <b>"+state.screenAngle+"°</b><br>"+
+      "samples averaged: <b>"+state.samplesUsed+"</b><br>"+
+      "compass (computed): <b>"+(state.compass!=null?state.compass.toFixed(1):"—")+"°</b><br>"+
+      "satellite bearing: <b>"+state.sat.toFixed(1)+"°</b><br>"+
+      "lat,lng: <b>"+(state.lat!=null?state.lat.toFixed(5)+", "+state.lng.toFixed(5):"—")+"</b>";
+
+    showScreen("screen-result", 2);
+  }
+
+  function exportObj(){
+    var anchor = state.sat;
+    var v = vastuOf(anchor);
+    return {
+      tool:"Disha Entrance North Finder v1",
+      capturedAt:new Date().toISOString(),
+      location:{ lat:state.lat, lng:state.lng },
+      entranceFacing:{
+        anchorSource:"satellite",
+        trueHeadingDeg:Math.round(anchor*10)/10,
+        compass16:card16(anchor),
+        vastuDirection:v.dir,
+        vastuSanskrit:v.sans
+      },
+      compass:{ magneticHeadingDeg: state.compass!=null?Math.round(state.compass*10)/10:null, samples:state.samplesUsed },
+      satelliteBearingDeg:Math.round(state.sat*10)/10,
+      differenceDeg: state.compass!=null?Math.round(angleDiff(state.compass,state.sat)*10)/10:null,
+      apparentDeclinationDeg: state.compass!=null?Math.round(signed180(state.sat-state.compass)*10)/10:null,
+      diagnostics:{ source:state.source, rawAlpha:state.lastAlpha, screenAngle:state.screenAngle }
+    };
+  }
+
+  /* ---------- wiring ---------- */
+  $("btn-begin").addEventListener("click", begin);
+  $("btn-capture").addEventListener("click", startCapture);
+  $("btn-recapture").addEventListener("click", recapture);
+  $("btn-to-map").addEventListener("click", function(){
+    showScreen("screen-satellite", 1);
+    initMap();
+    setTimeout(function(){ if(map) map.invalidateSize(); }, 250);
+  });
+  $("btn-back-compass").addEventListener("click", function(){ showScreen("screen-compass", 0); });
+  $("btn-locate").addEventListener("click", function(){ tryGeolocate(function(ok){ if(ok) toast("Centred on your location"); }); });
+  $("btn-to-result").addEventListener("click", buildResult);
+  $("btn-restart").addEventListener("click", function(){
+    state.compass=null; state.sat=null; recapture();
+    $("live-deg").textContent="––°"; $("live-dir").textContent="waiting";
+    showScreen("screen-compass", 0);
+  });
+
+  $("btn-copy").addEventListener("click", function(){
+    var txt = JSON.stringify(exportObj(), null, 2);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){ toast("Copied — paste into Claude"); },
+        function(){ toast("Copy failed"); });
+    } else { toast("Copy not supported here"); }
+  });
+  $("btn-download").addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(exportObj(), null, 2)], {type:"application/json"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "entrance-orientation.json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    toast("Saved entrance-orientation.json");
+  });
+
+  // keep arrow centered relative to map on resize
+  window.addEventListener("resize", function(){ if(map) setTimeout(function(){ map.invalidateSize(); },150); });
+})();
+</script>
+</body>
+</html>
